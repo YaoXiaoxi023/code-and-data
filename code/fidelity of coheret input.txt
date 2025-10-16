@@ -1,0 +1,72 @@
+from qutip import *
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 设置参数
+g = 0.01  # 一个常数
+c = 0.001  # 另一个常数
+N = 40   # 希尔伯特空间的维度
+psi = 0  # 压缩算符相位角
+s = 1
+
+# 定义参数范围
+r_vals = np.linspace(0, 5, 100)  # 让 r 从 0 变化到 5
+
+# 存储保真度的列表
+fidelity_vals_1 = []  # 用于存储第一个保真度
+fidelity_vals_2 = []  # 用于存储第二个保真度
+
+# 遍历不同的 r 值计算保真度
+for r in r_vals:
+    # 定义两个随 r 变化的态
+    psi1 = coherent(N,r) # 第一个态：压缩真空态
+    psi2 = (coherent(N, r) - 1j*r*g/2*(1+1/c)*create(N)*coherent(N, r)).unit()
+    psi3 = (create(N)*coherent(N,r)).unit()  # 第三个态
+
+    # 计算保真度
+    fidelity_1 = fidelity(psi1, psi2)  # 第一个保真度
+    fidelity_2 = fidelity(psi3, psi2)  # 第二个保真度
+
+    # 将保真度添加到列表中
+    fidelity_vals_1.append(fidelity_1)
+    fidelity_vals_2.append(fidelity_2)
+# 绘制两条曲线（美化版）
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# 绘制最优保真度
+ax.plot(r_vals,fidelity_vals_2, label='$F_1$', color='royalblue', linewidth=2.5)
+
+# 绘制r'固定为0时的保真度
+ax.plot(r_vals, fidelity_vals_1, label=r'$F_0$', 
+        color='seagreen', linestyle='--', linewidth=2.5)
+
+# 设置标题（如果你需要）
+# ax.set_title('Fidelity Optimization vs Alpha', fontsize=18)
+
+# 设置坐标轴标签
+ax.set_xlabel(r'$\beta$', fontsize=16)
+ax.set_ylabel(r'Fidelity $F$', fontsize=16)
+
+# 设置x轴和y轴范围
+ax.set_xlim(0, 3)
+ax.set_ylim(0, 1.02)
+
+# 设置刻度
+ax.set_xticks(np.linspace(0, 5, 6))  # 比如0, 0.5, 1.0, ..., 3
+ax.set_yticks(np.linspace(0, 1.0, 6))  # 0.0, 0.1, ..., 1.0
+ax.set_yticklabels(['', '0.2','0.4','0.6','0.8','1.0'])  # 删除0刻度标签
+
+# 设置刻度字体大小
+ax.tick_params(axis='both', which='major', labelsize=14)
+
+# 网格线
+ax.grid(True, linestyle='--', alpha=0.6)
+
+# 图例
+ax.legend(fontsize=14, loc='lower right', frameon=False)
+
+# 布局紧凑
+plt.tight_layout()
+
+# 显示图
+plt.show()

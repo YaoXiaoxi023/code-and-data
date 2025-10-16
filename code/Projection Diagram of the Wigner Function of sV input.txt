@@ -1,0 +1,90 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from qutip import *
+from matplotlib import gridspec
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+
+# 公共参数
+N = 35
+k = 5.005
+xvec = np.linspace(-5, 5, 200)
+pvec = np.linspace(-5, 5, 200)
+
+# 要绘制的 r 值
+r_values = [-0.7, 0.2]
+labels = ["(a)", "(b)", "(c)", "(d)"]
+
+fig = plt.figure(figsize=(18, 14))
+outer_gs = gridspec.GridSpec(2, 2, wspace=0.3, hspace=0.3, top=0.92)
+
+# 计算所有态及其 Wigner 函数
+states = []
+Wigner_list = []
+W_min, W_max = np.inf, -np.inf
+
+for r in r_values:
+    psi_in = (squeeze(N, r) * basis(N, 0)).unit()
+    psi = ((qeye(N) - 1j * k * num(N)) * psi_in).unit()
+    for state in [psi_in, psi]:
+        W = wigner(state, xvec, pvec)
+        Wigner_list.append(W)
+        states.append(state)
+        W_min = min(W_min, W.min())
+        W_max = max(W_max, W.max())
+
+# 设置对称颜色范围（使 0 为白色）
+max_abs = max(abs(W_min), abs(W_max))
+norm = Normalize(vmin=-max_abs, vmax=max_abs)
+
+# 绘图
+for idx, (W, label) in enumerate(zip(Wigner_list, labels)):
+    W_x_proj = np.trapz(W, pvec, axis=0)
+    W_p_proj = np.trapz(W, xvec, axis=1)
+
+    inner_gs = gridspec.GridSpecFromSubplotSpec(
+        2, 2, subplot_spec=outer_gs[idx],
+        width_ratios=[4, 1], height_ratios=[1, 4],
+        hspace=0.05, wspace=0.05
+    )
+
+    ax_top = fig.add_subplot(inner_gs[0, 0])
+    ax_top.plot(xvec, W_x_proj, color='#2b5d87', linewidth=1.2)
+    ax_top.fill_between(xvec, W_x_proj, 0, color='#2b5d87', alpha=0.15)
+    ax_top.set_xlim(-5, 5)
+    ax_top.set_xticks([])
+    ax_top.set_yticks([])
+    ax_top.grid(True, linestyle='--', alpha=0.3)
+
+    ax_main = fig.add_subplot(inner_gs[1, 0])
+    contour = ax_main.contourf(xvec, pvec, W, levels=50, cmap='RdBu_r', norm=norm)
+    ax_main.set_xlim(-5, 5)
+    ax_main.set_ylim(-5, 5)
+    ax_main.set_xlabel('$x$', fontsize=18)
+    ax_main.set_ylabel('$p$', fontsize=18)
+    ax_main.tick_params(labelsize=14)
+    ax_main.text(-4.8, 4.5, f"{label}", fontsize=16, weight='bold', ha='left', va='top')
+    ax_main.grid(True, linestyle='--', alpha=0.3)
+
+    ax_right = fig.add_subplot(inner_gs[1, 1])
+    ax_right.plot(W_p_proj, pvec, color='#9a2b37', linewidth=1.2)
+    ax_right.fill_betweenx(pvec, 0, W_p_proj, color='#9a2b37', alpha=0.15)
+    ax_right.set_ylim(-5, 5)
+    ax_right.set_xticks([])
+    ax_right.set_yticks([])
+    ax_right.grid(True, linestyle='--', alpha=0.3)
+
+# 色条设置（与 norm 一致）
+sm = ScalarMappable(norm=norm, cmap='RdBu_r')
+sm.set_array([])
+cbar_ax = fig.add_axes([0.25, 0.95, 0.5, 0.015])
+cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+cbar.set_label("Wigner Function value", fontsize=16, labelpad=10, loc='center')
+cbar.ax.xaxis.set_label_position('top')
+tick_vals = np.linspace(-max_abs, max_abs, 5)
+cbar.set_ticks(tick_vals)
+cbar.set_ticklabels([f"{v:.2f}" for v in tick_vals])
+cbar.ax.tick_params(labelsize=16)
+
+
+plt.show()

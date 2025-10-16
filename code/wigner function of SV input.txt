@@ -1,0 +1,88 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from qutip import *
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import Normalize
+
+# 设置全局字体参数
+plt.rcParams.update({
+    'font.size': 14,          # 全局基础字号
+    'axes.titlesize': 16,     # 轴标题字号
+    'axes.labelsize': 16,     # 轴标签字号
+    'xtick.labelsize': 14,    # x轴刻度字号
+    'ytick.labelsize': 14,    # y轴刻度字号
+    'legend.fontsize': 14     # 图例字号
+})
+
+# 设置图形大小（可调节）
+plt.figure(figsize=(16, 8))
+
+# 第一个子图 (a)
+ax1 = plt.subplot(121, projection='3d')
+
+# 参数设置
+N = 30      
+r = -0.7
+k = 5.005
+
+# 定义量子态和计算Wigner函数
+psi1 = (squeeze(N, r) * basis(N, 0) - 1j*k*num(N)*squeeze(N, r) * basis(N, 0)).unit()
+xvec = np.linspace(-4, 4, 100)
+pvec = np.linspace(-4, 4, 100)
+W1 = wigner(psi1, xvec, pvec)
+
+# 设置颜色范围和投影
+norm = Normalize(vmin=-0.4, vmax=0.3)
+z_projection = np.min(W1) - 0.05
+X, P = np.meshgrid(xvec, pvec)
+
+# 绘制图形
+ax1.contourf(X, P, W1, zdir='z', offset=z_projection, cmap='seismic', levels=100, norm=norm)
+ax1.set_zlim(z_projection, np.max(W1))
+ax1.view_init(elev=15, azim=160)
+ax1.set_axis_off()
+surf1 = ax1.plot_surface(X, P, W1, cmap='seismic', rstride=1, cstride=1, alpha=0.8, norm=norm)
+
+# 第二个子图 (b)
+ax2 = plt.subplot(122, projection='3d')
+
+# 参数设置和计算
+s1 = 2
+r_prime = -0.14
+psi2 = (squeeze(N, r_prime)*(coherent(N, s1) + coherent(N, -s1))).unit()
+W2 = wigner(psi2, xvec, pvec)
+
+# 绘制图形
+z_projection = np.min(W2) - 0.05
+ax2.contourf(X, P, W2, zdir='z', offset=z_projection, cmap='seismic', levels=100, norm=norm)
+ax2.set_zlim(z_projection, np.max(W2))
+ax2.view_init(elev=15, azim=160)
+ax2.set_axis_off()
+surf2 = ax2.plot_surface(X, P, W2, cmap='seismic', rstride=1, cstride=1, alpha=0.8, norm=norm)
+
+# 添加共享的colorbar（调整字号）
+cax = plt.axes([0.25, 0.80, 0.50, 0.015])
+cbar = plt.colorbar(surf1, cax=cax, orientation='horizontal')
+cbar.set_label('Wigner function value', fontsize=16, labelpad=5)
+
+cbar.set_ticks(np.linspace(-0.4, 0.3, 8))
+cbar.ax.xaxis.set_ticks_position('bottom')
+cbar.ax.xaxis.set_label_position('top')
+cbar.ax.tick_params(labelsize=18)  # 色条刻度字号
+
+# 添加底部标签（调整字号）
+plt.tight_layout()
+plt.subplots_adjust(top=0.85, bottom=0.15)
+
+def add_bottom_label(ax, label):
+    pos = ax.get_position()
+    fig_x_center = (pos.x0 + pos.x1) / 2
+    fig_y_bottom = pos.y0 - 0.05
+    plt.figtext(fig_x_center, fig_y_bottom, label, 
+                ha='center', va='top', fontsize=28  # 增大子图标签字号
+                )  # 可选：加粗标签
+
+add_bottom_label(ax1, '(a)')
+add_bottom_label(ax2, '(b)')
+
+plt.show()

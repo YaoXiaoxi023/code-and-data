@@ -1,0 +1,75 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from qutip import *
+from matplotlib.colors import Normalize
+
+# 参数设置
+N = 30
+g = 0.01
+c = 0.001
+alpha_list = [1.5, 2.0, 2.5]  # 用于生成态的 alpha
+
+# 每个子图的自定义标签（共 6 个：每个 alpha 两个图）
+alpha_label_list = [
+    r"$\ \alpha=1.5$", r"$\ \alpha'=2.0$",
+    r"$\ \alpha=2.0$", r"$\ \alpha'=2.41$",
+    r"$\ \alpha=3.0$", r"$\ \alpha'=3.3$"
+]
+
+xvec = np.linspace(-6, 6, 100)
+pvec = np.linspace(-6, 6, 100)
+X, P = np.meshgrid(xvec, pvec)
+
+norm = Normalize(vmin=-0.4, vmax=0.3)
+fig = plt.figure(figsize=(20, 10))
+
+for i, alpha in enumerate(alpha_list):
+    # 构造 psi_in 和 psi
+    psi_in = (coherent(N, alpha) + coherent(N, -alpha)).unit()
+    psi = ((qeye(N) - 1j * g / 2 * (1 + 1 / c) * num(N)) * psi_in).unit()
+
+    # 计算 Wigner 函数
+    W_in = wigner(psi_in, xvec, pvec)
+    W = wigner(psi, xvec, pvec)
+
+    # 投影位置
+    z_min = min(np.min(W_in), np.min(W))
+    delta = 0.2
+    z_proj = z_min - delta
+
+    for j, W_data in enumerate([W_in, W]):
+        ax = fig.add_subplot(2, 3, i + 1 + j * 3, projection='3d')
+        ax.plot_surface(X, P, W_data, cmap='seismic', rstride=1, cstride=1, alpha=0.8, norm=norm)
+        ax.contourf(X, P, W_data, zdir='z', offset=z_proj, cmap='seismic', levels=100, norm=norm)
+        ax.set_zlim(z_proj, np.max(W_data))
+        ax.set_axis_off()
+        ax.view_init(elev=20, azim=80)
+
+        # 使用每个子图对应的标签
+        ax.text(
+            x=-4.0, y=4.0, z=np.max(W_data),
+            s=alpha_label_list[i * 2 + j],
+            fontsize=18,
+            fontweight='bold',
+            color='black',
+            bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.3', alpha=0.6)
+        )
+
+# 添加 colorbar（向下移一点）
+cax = fig.add_axes([0.2, 0.88, 0.5, 0.015])  # y从0.93 → 0.88，height略增
+sm = plt.cm.ScalarMappable(cmap='seismic', norm=norm)
+sm.set_array([])
+cbar = fig.colorbar(sm, cax=cax, orientation='horizontal')
+fig.text(0.45, 0.91, 'Wigner function value', fontsize=16, ha='center')
+
+cbar.set_ticks(np.linspace(-0.4, 0.3, 8))
+cbar.ax.tick_params(labelsize=16)
+# 添加左侧标签（input / output）
+fig.text(0.10, 0.65, 'input', va='center', ha='left',
+         rotation='vertical', fontsize=20, weight='bold')
+fig.text(0.10, 0.22, 'output', va='center', ha='left',
+         rotation='vertical', fontsize=20, weight='bold')
+
+plt.tight_layout(rect=[0.05, 0, 0.80, 0.85])
+
+plt.show()

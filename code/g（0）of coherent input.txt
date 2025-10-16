@@ -1,0 +1,73 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import qutip as qt
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+
+# 设置参数
+g = 0.01
+c = 0.001
+N = 50
+alphas = np.linspace(0.01, 5, 200)
+
+# 算符定义
+a = qt.destroy(N)
+n_op = a.dag() * a
+n_op_1 = a.dag()**2 * a**2
+
+# 储存 g2(0) 值
+g2_vals_1 = []  # 微扰态
+g2_vals_2 = []  # SPACS 态
+
+for alpha in alphas:
+    # 态 1：微扰修正态
+    coh_1 = (
+        qt.coherent(N, alpha)
+        - 1j * alpha * g / 2 * (1 + 1 / c) * qt.create(N) * qt.coherent(N, alpha)
+    ).unit()
+
+    # 态 2：SPACS
+    coh_2 = (qt.create(N) * qt.coherent(N, alpha)).unit()
+
+    # 计算 g^(2)(0)
+    g2_1 = qt.expect(n_op_1, coh_1) / (qt.expect(n_op, coh_1) ** 2)
+    g2_2 = qt.expect(n_op_1, coh_2) / (qt.expect(n_op, coh_2) ** 2)
+
+    g2_vals_1.append(g2_1)
+    g2_vals_2.append(g2_2)
+
+# 🌈 绘图部分
+fig, ax = plt.subplots(figsize=(8, 5.5))
+
+# 曲线
+ax.plot(alphas, g2_vals_1, label=r'Output state $\left|\Phi\right\rangle$', color='tab:blue', linewidth=2)
+
+
+ax.plot(alphas, g2_vals_2, label=r'SPACS $(\hat{b}^\dagger|\beta\rangle)$',
+        color='tab:green', linestyle='--', linewidth=2)
+
+ax.axhline(1, color='red', linestyle='--', linewidth=1.5,
+           label=r'CS $(|\beta\rangle)$')
+
+
+# 坐标轴标签
+ax.set_xlabel(r'$\beta$', fontsize=14)
+ax.set_ylabel(r'$g^{(2)}(0)$', fontsize=14)
+
+# 设置 x/y 刻度间距
+ax.xaxis.set_major_locator(MultipleLocator(1))   # x 轴主刻度间距 0.5
+ax.yaxis.set_major_locator(MultipleLocator(0.2))   # y 轴主刻度间距 0.2
+
+# 设置 x 轴刻度：包含 0.01，然后从 1 到 5 每隔 1 个单位
+xticks = [0.01] + list(np.arange(1, 6, 1))
+ax.set_xticks(xticks)
+ax.set_xticklabels([f'{x:.2f}' if x == 0.01 else f'{x:.1f}' for x in xticks])
+
+
+# 图例、网格、美化
+ax.legend(fontsize=12)
+ax.grid(True, alpha=0.3)
+ax.set_xlim(alphas[0], alphas[-1])
+ax.set_ylim(0, max(max(g2_vals_1), max(g2_vals_2)) * 1.1)
+
+plt.tight_layout()
+plt.show()
