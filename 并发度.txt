@@ -1,0 +1,61 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib import colors
+
+# 定义函数
+def f(s, A):
+    return np.abs(((1 - np.exp(-2 * s**2)) * (1 - A**2)) /
+                  (1 + np.exp(-2 * s**2) + A**2 * (1 - np.exp(-2 * s**2))))
+
+# 网格
+s_vals = np.linspace(0, 2, 200)
+A_vals = np.linspace(0, 10, 200)
+S, A = np.meshgrid(s_vals, A_vals)
+Z = f(S, A)
+
+# 创建画布
+fig = plt.figure(figsize=(12, 8))
+norm = colors.Normalize(vmin=0, vmax=1)
+
+# -------- 图 (a): 3D 曲面图 --------
+ax1 = fig.add_axes([0.1, 0.55, 0.7, 0.55], projection='3d')  
+surf = ax1.plot_surface(S, A, Z, cmap='plasma', edgecolor='none', norm=norm)
+ax1.set_xlabel('s', fontsize=18, labelpad=15)   # s 更远 / 更近
+ax1.set_ylabel(r'$\langle A \rangle_{\omega}$', fontsize=18, labelpad=18)  # A 更下
+ax1.set_zlabel('C', fontsize=18, labelpad=10)   # C 更左
+ax1.view_init(elev=25, azim=188)
+ax1.set_xticks(np.arange(0, 2.1, 0.5))
+ax1.text2D(0.05, 0.85, "(a)", transform=ax1.transAxes, fontsize=18, fontweight='bold')
+ax1.tick_params(axis='both', which='major', labelsize=14)  
+ax1.zaxis.set_tick_params(labelsize=14)  
+ax1.set_zticks(np.arange(0, 1.001, 0.25))
+
+
+# 加色条
+cbar = fig.colorbar(surf, ax=ax1, shrink=0.6, aspect=14, pad=0.1)
+cbar.set_ticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+cbar.ax.tick_params(labelsize=14)  # 色条刻度字号
+
+# -------- 图 (b): f vs A --------
+ax2 = fig.add_axes([0.1, 0.15, 0.30, 0.35])  
+ax2.plot(A_vals, f(1.5, A_vals), color='#d62728', lw=2)
+ax2.set_xlabel(r'$\langle A \rangle_{\omega}$', fontsize=18)
+ax2.set_ylabel('C', fontsize=18)
+ax2.set_title(r'$s=1.5$', fontsize=18)
+ax2.grid(alpha=0.3)
+ax2.text(0.1, 0.90, "(b)", transform=ax2.transAxes, fontsize=22, fontweight='bold')
+ax2.tick_params(axis='both', which='major', labelsize=14)
+
+# -------- 图 (c): f vs s --------
+ax3 = fig.add_axes([0.55, 0.15, 0.30, 0.35])  
+ax3.plot(s_vals, f(s_vals, 10), color='#1f77b4', lw=2)
+ax3.set_xlabel('s', fontsize=18)
+ax3.set_ylabel('C', fontsize=18)
+ax3.set_title(r'$\langle A \rangle_{\omega}=10$', fontsize=18)
+ax3.set_xticks([0, 0.5, 1, 1.5, 2])
+ax3.grid(alpha=0.3)
+ax3.text(0.02, 0.90, "(c)", transform=ax3.transAxes, fontsize=18, fontweight='bold')
+ax3.tick_params(axis='both', which='major', labelsize=14)
+
+plt.show()

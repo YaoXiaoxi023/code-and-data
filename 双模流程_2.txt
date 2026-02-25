@@ -1,0 +1,143 @@
+from qutip import *
+import numpy as np
+import qutip as qt
+import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+
+# 设置参数
+n1 = 20         # Fock 空间截断维度
+alpha_0 = 0       #相干振幅
+alpha_1 = 0
+r_1 = 0.5
+r_0 = 0
+theta = -np.pi/2 #移相器相角
+a = 10          #弱值0模式
+b = 10          #弱值1模式 
+s_0 = 0
+s_1 = 2
+t1 = 1 + a
+t2 = 1 - a
+h1 = 1 + b
+h2 = 1 - b
+
+# 构造两个模的湮灭算符
+a_2 = tensor(qeye(n1), destroy(n1)) #a_2
+a_3 = tensor(destroy(n1), qeye(n1)) #a_3
+
+def displace_op_1(alpha):  
+    return (alpha/np.sqrt(2) * ( a_3.dag() + a_2.dag() ) - np.conj(alpha)/np.sqrt(2) * (a_3 + a_2 )).expm()
+def displace_op_0(beta):
+    return (beta/np.sqrt(2) * ( a_2.dag() - a_3.dag() ) - np.conj(beta)/np.sqrt(2)*( a_2 - a_3 )).expm()
+def sqeeuze_op_1(r_1):
+    return (1/4 * ( np.conj(r_1) * ( a_2 + a_3 )**2 - r_1*( a_2.dag() + a_3.dag() )**2)).expm()
+def sqeeuze_op_0(r_0):
+    return (1/4 * ( np.conj(r_0) * ( a_2 - a_3 )**2 - r_0*( a_2.dag() - a_3.dag() )**2)).expm()    
+# 构造两个 odd coherent state
+U_1 = t1 * displace_op_0(s_0) + t2 * displace_op_0(-s_0)
+U_2 = h1 * displace_op_1(s_1) + t2 * displace_op_1(-s_1)
+psi_1=basis(n1,0)
+psi_2=basis(n1,0)
+# 输入态：两个模均为 odd state
+psi_in = tensor(psi_2,psi_1)
+
+# 作用后输出态
+Psi = ( U_1 * U_2 * displace_op_1(alpha_1)*displace_op_0(alpha_0)
+       *sqeeuze_op_1(r_1)*sqeeuze_op_0(r_0)*psi_in).unit()
+
+
+# 位移算符 D(+Gamma) 仅作用到 a 模式
+def displacement_operator(z, dim):
+    """构造位移算符 D(z) 仅作用到 a 模式"""
+    return qt.displace(dim, z)
+
+# P_J算符
+a = qt.destroy(n1)
+b = qt.destroy(n1)
+P_J_a = (np.pi * 1j * (a.dag() * a)).expm()
+P_J_b = (np.pi * 1j * (b.dag() * b)).expm()
+P_J = qt.tensor(P_J_a, P_J_b)
+
+def wigner_function(rho, D_a, D_b, P_J):
+    """计算 Wigner 函数的期望值形式"""
+    D_a_b = tensor(D_a, D_b)  # 将 D_a 和 D_b 合并为张量积
+    trace_value = (rho * D_a_b * P_J * D_a_b.dag()).tr()  # 计算迹
+    return trace_value.real  # 返回实部
+
+# 准备图形数据
+xx = np.linspace(-2, 2, 40)
+yy = np.linspace(-2, 2, 40)
+
+# 预计算位移算符
+D_a_real_values = [displacement_operator(complex(x, 0), n1) for x in xx]
+D_b_real_values = [displacement_operator(complex(y, 0), n1) for y in yy]
+D_a_imag_values = [displacement_operator(complex(0, x), n1) for x in xx]
+D_b_imag_values = [displacement_operator(complex(0, y), n1) for y in yy]
+
+rho = Psi * Psi.dag()
+
+# 并行计算
+def compute_wigner(i, j, D_a_values, D_b_values):
+    D_a = D_a_values[i]
+    D_b = D_b_values[j]
+    return wigner_function(rho, D_a, D_b, P_J)
+
+W1 = np.zeros((len(xx), len(yy)))
+W2 = np.zeros((len(xx), len(yy)))
+
+# 图一：alpha 和 beta 为实数
+results_real = Parallel(n_jobs=-1)(
+    delayed(compute_wigner)(i, j, D_a_real_values, D_b_real_values)
+    for i in range(len(xx))
+    for j in range(len(yy))
+)
+W1 = np.array(results_real).reshape(len(xx), len(yy))
+
+# 图二：alpha 和 beta 为纯虚数
+results_imag = Parallel(n_jobs=-1)(
+    delayed(compute_wigner)(i, j, D_a_imag_values, D_b_imag_values)
+    for i in range(len(xx))
+    for j in range(len(yy))
+)
+W2 = np.array(results_imag).reshape(len(xx), len(yy))
+
+# 限制 Wigner 函数结果在 [-1, 1]
+W1 = np.clip(W1, -1, 1)
+W2 = np.clip(W2, -1, 1)
+
+# 创建图形和子图
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+# 绘制图一：alpha 和 beta 为实数
+c1 = axes[0].imshow(
+    W1,
+    extent=[-2, 2, -2, 2],
+    origin='lower',
+    cmap='RdBu_r',  # 使用红蓝分隔颜色映射
+    vmin=-1,  # 固定范围为 -1 到 1
+    vmax=1
+)
+axes[0].set_title("Real α and β")
+axes[0].set_xlabel('Re(α)')
+axes[0].set_ylabel('Re(β)')
+
+# 绘制图二：alpha 和 beta 为纯虚数
+c2 = axes[1].imshow(
+    W2,
+    extent=[-2, 2, -2, 2],
+    origin='lower',
+    cmap='RdBu_r',  # 使用红蓝分隔颜色映射
+    vmin=-1,  # 固定范围为 -1 到 1
+    vmax=1
+)
+axes[1].set_title("Imaginary α and β")
+axes[1].set_xlabel('Im(α)')
+axes[1].set_ylabel('Im(β)')
+
+# 添加 colorbar
+cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+fig.colorbar(c1, cax=cbar_ax, ticks=np.linspace(-1, 1, 5))  # 添加刻度
+cbar_ax.set_title('Wigner', fontsize=10)
+
+# 显示图形
+plt.tight_layout(rect=[0, 0, 0.9, 1])  # 调整布局以适应 colorbar
+plt.show()

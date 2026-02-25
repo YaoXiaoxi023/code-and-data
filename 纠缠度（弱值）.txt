@@ -1,0 +1,81 @@
+from qutip import *
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Hilbert 空间截断维度
+n1 = 20
+
+# —— 基本算符 ——
+a_2 = tensor(qeye(n1), destroy(n1))   # 模式2
+a_3 = tensor(destroy(n1), qeye(n1))   # 模式1
+
+def squeeze_op_23(xi):
+    """双模挤压算符 exp(conj(xi) a2 a1 - xi a2^† a1^†)."""
+    return (np.conj(xi) * a_2 * a_3 - xi * a_2.dag() * a_3.dag()).expm()
+
+def build_state(a, s, r):
+    """构造 |Psi(a, s, r)>"""
+    S23 = squeeze_op_23(r)
+    s1 = s * np.exp(r)       # 有效相干幅
+    spin_1 = coherent(n1, s1/np.sqrt(2))
+    spin_2 = coherent(n1, -s1/np.sqrt(2))
+    Two_spin_1 = tensor(spin_1, spin_1)
+    Two_spin_2 = tensor(spin_2, spin_2)
+    
+    t1 = 1 + a
+    t2 = 1 - a
+    psi_unnorm = t1 * Two_spin_1 + t2 * Two_spin_2
+    return (S23 * psi_unnorm).unit()
+
+# —— 线性熵函数 ——
+def linear_entropy(rho):
+    """S_L = 1 - Tr(rho^2)"""
+    rho2 = rho * rho
+    return 1 - (rho2.tr()).real
+
+def linear_entropy_subsystem_A(a, s, r):
+    """给定参数 a,s,r，返回模式A的线性熵"""
+    psi = build_state(a, s, r)
+    rho = psi * psi.dag()
+    rho_A = rho.ptrace(0)
+    return linear_entropy(rho_A)
+
+# —— 固定 r=1.0，扫描 a ——
+r_fixed = 1.0
+a_values = np.linspace(0, 10, 50)
+
+# 三条曲线 (不同 s)
+S_L_s005 = [linear_entropy_subsystem_A(av, 0.05, r_fixed) for av in a_values]
+S_L_s010 = [linear_entropy_subsystem_A(av, 0.1, r_fixed) for av in a_values]
+S_L_s100 = [linear_entropy_subsystem_A(av, 1.0, r_fixed) for av in a_values]
+
+# —— 绘图 ——
+plt.figure(figsize=(8,6))
+
+plt.plot(a_values, S_L_s005, lw=2, label="s = 0.05", color="blue")
+plt.plot(a_values, S_L_s010, lw=2, label="s = 0.10", color="orange")
+plt.plot(a_values, S_L_s100, lw=2, label="s = 1.00", color="green")
+
+# 添加水平直线
+y_const = 0.7341977688313148
+plt.axhline(y=y_const, color="red", linestyle="--", lw=2, label="TMSV(r=1.0)")
+
+# 坐标轴与标题
+plt.xlabel(r"$\langle A \rangle_{w}$", fontsize=18)
+# 设置横坐标刻度并放大字号
+plt.xticks([0, 2, 4, 6, 8, 10], fontsize=18)
+plt.yticks(fontsize=18)
+
+plt.legend(fontsize=14, loc="lower right", frameon=True, shadow=True,
+           bbox_to_anchor=(1, 0.3))
+
+
+# 左上角加标签 (a)
+plt.text(0.01, 0.99, "(d)", transform=plt.gca().transAxes,
+         fontsize=18, fontweight="bold", ha="left", va="top")
+
+# 网格
+plt.grid(True, ls="--", alpha=0.6)
+
+plt.tight_layout()
+plt.show()

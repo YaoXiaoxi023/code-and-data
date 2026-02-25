@@ -1,0 +1,110 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from qutip import *
+from matplotlib import gridspec
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+
+# 配置参数列表
+configs = [
+    {"s1": 0, "a": 0,   "r": 1.0, "label": "(a)"},
+    {"s1": 1.5, "a": 0,   "r": 1.0, "label": "(b)"},
+    {"s1": 1.5, "a": 10, "r": 1.0, "label": "(c)"},
+    {"s1": 1.5, "a": -1j, "r":1.0, "label": "(d)"}
+]
+
+# 公共参数
+N = 35
+alpha = 1
+xvec = np.linspace(-5, 5, 200)
+pvec = np.linspace(-5, 5, 200)
+
+# 用于收集所有Wigner函数值范围
+Wigner_list = []
+W_min = np.inf
+W_max = -np.inf
+
+# 第一次循环：计算所有Wigner函数并更新极值
+for cfg in configs:
+    s1, a, r = cfg["s1"], cfg["a"], cfg["r"]
+    t1, t2 = 1 + a, 1 - a
+
+    U = t1 * displace(N, s1) + t2 * displace(N, -s1)
+    psi = (U * displace(N, alpha) * squeeze(N, r) * fock(N, 0)).unit()
+
+    W = wigner(psi, xvec, pvec)
+    Wigner_list.append(W)
+
+    W_min = min(W_min, W.min())
+    W_max = max(W_max, W.max())
+
+# 创建画布
+fig = plt.figure(figsize=(16, 12))
+outer_gs = gridspec.GridSpec(2, 2, wspace=0.3, hspace=0.3)
+
+# 第二次循环：绘图
+for idx, (cfg, W) in enumerate(zip(configs, Wigner_list)):
+    s1, a, r, label = cfg["s1"], cfg["a"], cfg["r"], cfg["label"]
+
+    # 计算边缘投影
+    W_x_proj = np.trapz(W, pvec, axis=0)
+    W_p_proj = np.trapz(W, xvec, axis=1)
+
+    # 子图布局
+    inner_gs = gridspec.GridSpecFromSubplotSpec(
+        2, 2, subplot_spec=outer_gs[idx],
+        width_ratios=[4, 1], height_ratios=[1, 4],
+        hspace=0.05, wspace=0.05
+    )
+
+    # x 投影图
+    ax_top = fig.add_subplot(inner_gs[0, 0])
+    ax_top.plot(xvec, W_x_proj, color='#2b5d87', linewidth=1.2)
+    ax_top.fill_between(xvec, W_x_proj, 0, color='#2b5d87', alpha=0.15)
+    ax_top.set_xlim(-5, 5)
+    ax_top.set_xticks([])
+    ax_top.set_yticks([])
+    ax_top.grid(True, linestyle='--', alpha=0.3)
+    ax_top.tick_params(axis='both', which='major', labelsize=18)
+
+    # 主图：Wigner 函数
+    ax_main = fig.add_subplot(inner_gs[1, 0])
+    ax_main.grid(True, linestyle='--', alpha=0.3)
+    contour = ax_main.contourf(
+        xvec, pvec, W, levels=50, cmap='RdBu_r',
+        vmin=W_min, vmax=W_max
+    )
+    ax_main.set_xlim(-5, 5)
+    ax_main.set_ylim(-5, 5)
+    ax_main.set_xlabel('$x$', fontsize=18)
+    ax_main.set_ylabel('$p$', fontsize=18)
+    ax_main.tick_params(axis='both', which='major', labelsize=18)
+    ax_main.text(-4.8, 4.5, label, fontsize=18, weight='bold', ha='left', va='top')
+
+    # p 投影图
+    ax_right = fig.add_subplot(inner_gs[1, 1])
+    ax_right.plot(W_p_proj, pvec, color='#9a2b37', linewidth=1.2)
+    ax_right.fill_betweenx(pvec, 0, W_p_proj, color='#9a2b37', alpha=0.15)
+    ax_right.set_ylim(-5, 5)
+    ax_right.set_xticks([])
+    ax_right.set_yticks([])
+    ax_right.grid(True, linestyle='--', alpha=0.3)
+    ax_right.tick_params(axis='both', which='major', labelsize=18)
+
+# 添加统一色条
+norm = Normalize(vmin=W_min, vmax=W_max)
+sm = ScalarMappable(norm=norm, cmap='RdBu_r')
+sm.set_array([])
+
+cbar_height = 0.015
+cbar_ax = fig.add_axes([0.25, 0.92, 0.5, cbar_height])
+cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+cbar.set_label("Wigner Function value", fontsize=18, labelpad=10, loc='center')
+cbar.ax.xaxis.set_label_position('top')
+tick_vals = np.linspace(W_min, W_max, 6)
+cbar.set_ticks(tick_vals)
+cbar.set_ticklabels([f"{v:.2f}" for v in tick_vals])
+cbar.ax.tick_params(labelsize=18)
+
+plt.show()
+

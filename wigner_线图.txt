@@ -1,0 +1,86 @@
+from qutip import *
+import numpy as np
+import qutip as qt
+import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+import matplotlib.pyplot as plt
+
+# 参数设置
+n1 = 20      
+s1 = 2
+a=0
+
+t1 = 1 + a
+t2 = 1 - a
+spin_1 = coherent(n1, s1 / np.sqrt(2))
+spin_2 = coherent(n1, -s1 / np.sqrt(2))
+Two_spin_1 = tensor(spin_1, spin_1)
+Two_spin_2 = tensor(spin_2, spin_2)
+Psi = (t1 * Two_spin_1 - t2 * Two_spin_2).unit()
+
+# 位移算符 D(+Gamma) 仅作用到 a 模式
+def displacement_operator(z, dim):
+    """构造位移算符 D(z) 仅作用到 a 模式"""
+    return qt.displace(dim, z)
+
+# P_J算符
+a = qt.destroy(n1)
+b = qt.destroy(n1)
+P_J_a = (np.pi * 1j * (a.dag() * a)).expm()
+P_J_b = (np.pi * 1j * (b.dag() * b)).expm()
+P_J = qt.tensor(P_J_a, P_J_b)
+
+def wigner_function(rho, D_a, D_b, P_J):
+    """计算 Wigner 函数的期望值形式"""
+    D_a_b = tensor(D_a, D_b)  # 将 D_a 和 D_b 合并为张量积
+    trace_value = (rho * D_a_b * P_J * D_a_b.dag()).tr()  # 计算迹
+    return trace_value.real  # 返回实部
+
+# 准备图形数据
+xx = np.linspace(-4, 4, 50)
+yy = np.linspace(-4, 4, 50)
+W3 = np.linspace(-2, 2, 50) #图三
+W4 = np.linspace(-2, 2, 50) #图四
+for i, x in enumerate(xx):
+     # 图三: alpha 和 beta 的实部相等
+        alpha = complex(x, 0)
+        D_a = displacement_operator(alpha, n1)
+        D_b = displacement_operator(alpha, n1)
+        rho3=Psi*Psi.dag()
+        W3[i] = wigner_function(rho3, D_a, D_b, P_J)
+    # 图四: alpha 和 beta 的实部相等
+        alpha = complex(0, x)
+        D_a = displacement_operator(alpha, n1)
+        D_b = displacement_operator(alpha, n1)
+        rho4=Psi*Psi.dag()
+        W4[i] = wigner_function(rho4, D_a, D_b, P_J)
+# 创建图形和子图
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# 绘制图三：alpha和beta实部相等
+axes[0].plot(xx, W3, color="blue", linestyle="-", linewidth=2, label="Wigner Function")
+axes[0].set_title("Joint Parity for Re(α) (Re(α)=Re(β))", fontsize=14)
+axes[0].set_xlabel("Re(α)", fontsize=12)
+axes[0].set_ylabel("Joint Parity", fontsize=12)
+axes[0].set_ylim(-1.0, 1.0)
+axes[0].grid(True, linestyle="--", alpha=0.7)
+axes[0].legend(fontsize=10)
+# 在子图底部添加标识符（c）
+axes[0].text(0.5, -0.18, '(c)', ha='center', transform=axes[0].transAxes, fontsize=14, clip_on=False)
+
+# 绘制图四：alpha和beta虚部相等
+axes[1].plot(xx, W4, color="red", linestyle="--", linewidth=2, label="Wigner Function")
+axes[1].set_title("Joint Parity for Im(α) (Im(α)=Im(β))", fontsize=14)
+axes[1].set_xlabel("Im(α)", fontsize=12)
+axes[1].set_ylabel("Joint Parity", fontsize=12)
+axes[1].set_ylim(-1.0, 1.0)
+axes[1].grid(True, linestyle="--", alpha=0.7)
+axes[1].legend(fontsize=10)
+# 在子图底部添加标识符（d）
+axes[1].text(0.5, -0.18, '(d)', ha='center', transform=axes[1].transAxes, fontsize=14, clip_on=False)
+
+# 调整子图布局并保存
+plt.tight_layout()
+
+# 显示图形
+plt.show()
